@@ -1,26 +1,28 @@
 import sys
-from cell import Solid, Water, Sand, Fire
+from cell import *
 import pygame, numpy as np
 from pygame.locals import *
 
 
 CELL_SIZE = 10
-SCREEN_WIDTH = 640
-SCREEN_HEIGHT = 640
+SCREEN_WIDTH = 1080
+SCREEN_HEIGHT = 720
 grid = np.zeros(shape=(SCREEN_WIDTH // CELL_SIZE, SCREEN_HEIGHT // CELL_SIZE))
 
-cell_type = "solid"  # Default cell type
-cells = {
-    "solid": [],
-    "sand": [],
-    "water": [],
-    "fire": [],
-}  # Dictionary to hold cell types and their instances
 
 clock = pygame.time.Clock()
 timer = pygame.time.get_ticks()
 CellFramePerUpdate = 50  # Number of frames per second for the cell update
+GhostCellFix = 0
 
+cell_type = "solid"  # Default cell type
+cells = {
+    "fire": [],
+    "water": [],
+    "sand": [],
+    "burn solid": [],
+    "solid": [],
+}  # Dictionary to hold cell types and their instances
 valid_substance = list(cells.keys()) + ["empty"]  # valid substances each cell can be
 
 
@@ -33,7 +35,7 @@ def update(dt):
     x += v * dt
     and this will scale your velocity based on time. Extend as necessary."""
 
-    global cell_type, timer, CellFramePerSec
+    global cell_type, timer, CellFramePerSec, GhostCellFix
 
     for event in pygame.event.get():
         if event.type == QUIT:
@@ -57,21 +59,34 @@ def update(dt):
                             cell.remove(grid, cells)
             elif grid[x, y] == 0:
                 # Set the cell to a color
-                grid[x, y] = 2 if cell_type in ["water", "fire"] else 1
+                # grid[x, y] = 2 if cell_type in ["water", "fire"] else 1
                 # cells[f"{cell_type}"].append(Cell(cell_type, (x, y)))
-                if cell_type == "solid":
+                if cell_type == "burn solid":
+                    cells["burn solid"].append(BurnSolid((x, y)))
+                    grid[x, y] = SOLID_LAYER
+                elif cell_type == "solid":
                     cells["solid"].append(Solid((x, y)))
+                    grid[x, y] = SOLID_LAYER
                 elif cell_type == "water":
                     cells["water"].append(Water((x, y)))
+                    grid[x, y] = WATER_LAYER
                 elif cell_type == "sand":
                     cells["sand"].append(Sand((x, y)))
+                    grid[x, y] = SAND_LAYER
                 elif cell_type == "fire":
                     cells["fire"].append(Fire((x, y)))
+                    grid[x, y] = FIRE_LAYER
 
     if pygame.time.get_ticks() - timer > CellFramePerUpdate:
         for cell in cells["sand"][::-1] + cells["water"][::-1] + cells["fire"][::-1]:
             cell.update(grid, cells)
         timer = pygame.time.get_ticks()
+
+        GhostCellFix += 1
+        if GhostCellFix >= 20:
+            for celltype in cells.keys():
+                for cell in cells[celltype]:
+                    cell.fix(grid)
 
 
 def draw(screen, text_font, text_rect):
@@ -104,8 +119,8 @@ def runPyGame():
     text_rect = text.get_rect()
 
     # Set up the window.
-    width, height = 640, 640
-    screen = pygame.display.set_mode((width, height))
+    # width, height = 640, 640
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
     # Main game loop.
     dt = 1 / fps
