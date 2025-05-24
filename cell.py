@@ -146,33 +146,43 @@ class Water(Cell):
         if neighbors[8] == SAND_LAYER:
             self.move(grid, 0, -1, SAND_LAYER)
         # Move down if possible, update random moving direction
-        elif neighbors[6] == EMPTY_LAYER:
+        elif neighbors[6] in [EMPTY_LAYER, FIRE_LAYER]:
             self.move(grid, 0, 1)
             self.direction = random.choice([0, 1])
         else:
             # Fall to the sides
             if (
                 random.choice([0, 1])
-                and neighbors[5] == EMPTY_LAYER
-                and neighbors[3] == EMPTY_LAYER
+                and neighbors[5] in [EMPTY_LAYER, FIRE_LAYER]
+                and neighbors[3] in [EMPTY_LAYER, FIRE_LAYER]
             ):
                 self.move(grid, -1, 1)
-            elif neighbors[7] == EMPTY_LAYER and neighbors[4] == EMPTY_LAYER:
+            elif neighbors[7] in [EMPTY_LAYER, FIRE_LAYER] and neighbors[4] in [
+                EMPTY_LAYER,
+                FIRE_LAYER,
+            ]:
                 self.move(grid, 1, 1)
             else:
                 # If the direction is right and is available to move to, move to the right
-                if self.direction and neighbors[3] == EMPTY_LAYER:
+                if self.direction and neighbors[3] in [EMPTY_LAYER, FIRE_LAYER]:
                     self.move(grid, -1, 0)
                 # Check if you can move to the left and direction is left
-                elif neighbors[4] == EMPTY_LAYER:
+                elif neighbors[4] in [EMPTY_LAYER, FIRE_LAYER]:
                     self.move(grid, 1, 0)
-                    self.direction = 0 if self.direction == 1 else 1
+                    # self.direction = 0 if self.direction == 1 else 1
                 # Recheck right and move
-                elif neighbors[3] == EMPTY_LAYER:
+                elif neighbors[3] in [EMPTY_LAYER, FIRE_LAYER]:
                     self.move(grid, -1, 0)
+                    self.direction = 0 if self.direction == 1 else 1
                 # Flip direction
                 else:
                     self.direction = 0 if self.direction == 1 else 1
+
+        self.color = (
+            0,
+            100 - self.position[1],
+            255 - self.position[1],
+        )
 
 
 # Fire Cell
@@ -196,6 +206,10 @@ class Fire(Cell):
         normal = random.normalvariate(5, 10)
         # if random.random() < 0.2:
         # pass
+        if neighbors[8] == WATER_LAYER:
+            self.remove(grid, cell_dict)
+            return
+
         if normal < 2 and neighbors[0] == EMPTY_LAYER and neighbors[3] == EMPTY_LAYER:
             self.move(grid, -1, -1)
         elif normal > 8 and neighbors[1] == EMPTY_LAYER and neighbors[4] == EMPTY_LAYER:

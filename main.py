@@ -12,7 +12,7 @@ grid = np.zeros(shape=(SCREEN_WIDTH // CELL_SIZE, SCREEN_HEIGHT // CELL_SIZE))
 
 clock = pygame.time.Clock()
 timer = pygame.time.get_ticks()
-CellFramePerUpdate = 50  # Number of frames per second for the cell update
+CellFramePerUpdate = 30  # Number of frames per second for the cell update
 GhostCellFix = 0
 
 cell_type = "solid"  # Default cell type
