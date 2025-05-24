@@ -253,3 +253,22 @@ class Fire(Cell):
                                 )
                             else:
                                 cell.burn_damage -= 1
+
+
+# Destroy Cell
+# Layer: 0
+class Destroy(Cell):
+    def __init__(self, position=(0, 0)):
+        super().__init__("destroy", position, EMPTY_LAYER)
+
+        self.color = (150, 0, 0)
+
+    def update(self, grid, cell_dict):
+
+        if grid[self.position[0], self.position[1]] != EMPTY_LAYER:
+            for celltype in cell_dict:  # for each cell type
+                if celltype == "destroy" or celltype == "solid":
+                    continue
+                for cell in cell_dict[celltype]:  # for each cell in the list
+                    if cell.position == self.position:
+                        cell.remove(grid, cell_dict)

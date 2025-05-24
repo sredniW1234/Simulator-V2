@@ -22,6 +22,7 @@ cells = {
     "sand": [],
     "burn solid": [],
     "solid": [],
+    "destroy": [],
 }  # Dictionary to hold cell types and their instances
 valid_substance = list(cells.keys()) + ["empty"]  # valid substances each cell can be
 
@@ -76,9 +77,17 @@ def update(dt):
                 elif cell_type == "fire":
                     cells["fire"].append(Fire((x, y)))
                     grid[x, y] = FIRE_LAYER
+                elif cell_type == "destroy":
+                    cells["destroy"].append(Destroy((x, y)))
+                    grid[x, y] = EMPTY_LAYER
 
     if pygame.time.get_ticks() - timer > CellFramePerUpdate:
-        for cell in cells["sand"][::-1] + cells["water"][::-1] + cells["fire"][::-1]:
+        for cell in (
+            cells["sand"][::-1]
+            + cells["water"][::-1]
+            + cells["fire"][::-1]
+            + cells["destroy"]
+        ):
             cell.update(grid, cells)
         timer = pygame.time.get_ticks()
 
