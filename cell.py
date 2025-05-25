@@ -7,6 +7,7 @@ SOLID_LAYER = 1
 SAND_LAYER = 2
 WATER_LAYER = 3
 FIRE_LAYER = 4
+SMOKE_LAYER = 5
 
 
 class Cell:
@@ -15,11 +16,13 @@ class Cell:
         cell_type: str = "solid",
         position: tuple[int, int] = (0, 0),
         layer: int = 1,
+        ignore_layers: list[int] = [EMPTY_LAYER],
     ) -> None:
 
         self.cell_type = cell_type  # Type of cell (e.g. solid, sand, water)
         self.position = position  # Position of the cell in the grid
         self.cell_layer = layer
+        self.ignore_layers = ignore_layers
 
     # Move the cell on the grid
     def move(self, grid, dx: int, dy: int, fill_type=0) -> None:
@@ -67,6 +70,13 @@ class Cell:
 
     # Makes sure that the grid is synced and that there are no ghost cells
     def fix(self, grid):
+        if (
+            self.position[0] < 0
+            or self.position[0] >= len(grid)
+            or self.position[1] < 0
+            or self.position[1] >= len(grid[0])
+        ):
+            return
         if grid[self.position[0], self.position[1]] != self.cell_layer:
             grid[self.position[0], self.position[1]] = self.cell_layer
 
@@ -98,7 +108,9 @@ class Solid(Cell):
 # Layer: 2
 class Sand(Cell):
     def __init__(self, position=(0, 0)):
-        super().__init__("sand", position, SAND_LAYER)
+        super().__init__(
+            "sand", position, SAND_LAYER, [EMPTY_LAYER, SMOKE_LAYER, FIRE_LAYER]
+        )
 
         self.color = (194, 178, 128)
         self.friction = 0.1
@@ -112,19 +124,22 @@ class Sand(Cell):
             self.chance = random.random()
 
         # Fall if able to (Ignore water)
-        if neighbors[6] in (EMPTY_LAYER, WATER_LAYER):
+        if neighbors[6] in self.ignore_layers + [WATER_LAYER]:
             self.move(grid, 0, 1)
 
         # Fall to the side
         elif self.chance > self.friction:
             if (
                 random.choice([0, 1])
-                and neighbors[5] == EMPTY_LAYER
-                and neighbors[3] == EMPTY_LAYER
+                and neighbors[5] in self.ignore_layers
+                and neighbors[3] in self.ignore_layers
             ):
                 self.move(grid, -1, 1)
                 self.chance = random.random()
-            elif neighbors[7] == EMPTY_LAYER and neighbors[4] == EMPTY_LAYER:
+            elif (
+                neighbors[7] in self.ignore_layers
+                and neighbors[4] in self.ignore_layers
+            ):
                 self.move(grid, 1, 1)
                 self.chance = random.random()
 
@@ -133,7 +148,9 @@ class Sand(Cell):
 # Layer: 3
 class Water(Cell):
     def __init__(self, position=(0, 0)):
-        super().__init__("water", position, WATER_LAYER)
+        super().__init__(
+            "water", position, WATER_LAYER, [EMPTY_LAYER, FIRE_LAYER, SMOKE_LAYER]
+        )
 
         self.color = (0, 100, 255)
         self.direction = random.choice([0, 1])
@@ -146,32 +163,32 @@ class Water(Cell):
         if neighbors[8] == SAND_LAYER:
             self.move(grid, 0, -1, SAND_LAYER)
         # Move down if possible, update random moving direction
-        elif neighbors[6] in [EMPTY_LAYER, FIRE_LAYER]:
+        elif neighbors[6] in self.ignore_layers:
             self.move(grid, 0, 1)
             self.direction = random.choice([0, 1])
         else:
             # Fall to the sides
             if (
                 random.choice([0, 1])
-                and neighbors[5] in [EMPTY_LAYER, FIRE_LAYER]
-                and neighbors[3] in [EMPTY_LAYER, FIRE_LAYER]
+                and neighbors[5] in self.ignore_layers
+                and neighbors[3] in self.ignore_layers
             ):
                 self.move(grid, -1, 1)
-            elif neighbors[7] in [EMPTY_LAYER, FIRE_LAYER] and neighbors[4] in [
+            elif neighbors[7] in self.ignore_layers and neighbors[4] in [
                 EMPTY_LAYER,
                 FIRE_LAYER,
             ]:
                 self.move(grid, 1, 1)
             else:
                 # If the direction is right and is available to move to, move to the right
-                if self.direction and neighbors[3] in [EMPTY_LAYER, FIRE_LAYER]:
+                if self.direction and neighbors[3] in self.ignore_layers:
                     self.move(grid, -1, 0)
                 # Check if you can move to the left and direction is left
-                elif neighbors[4] in [EMPTY_LAYER, FIRE_LAYER]:
+                elif neighbors[4] in self.ignore_layers:
                     self.move(grid, 1, 0)
                     # self.direction = 0 if self.direction == 1 else 1
                 # Recheck right and move
-                elif neighbors[3] in [EMPTY_LAYER, FIRE_LAYER]:
+                elif neighbors[3] in self.ignore_layers:
                     self.move(grid, -1, 0)
                     self.direction = 0 if self.direction == 1 else 1
                 # Flip direction
@@ -185,16 +202,84 @@ class Water(Cell):
         )
 
 
+class Smoke(Cell):
+    def __init__(self, position=(0, 0)):
+        super().__init__("smoke", position, SMOKE_LAYER, [EMPTY_LAYER, FIRE_LAYER])
+
+        self.variation = random.randrange(10, 100)
+        self.color = (170 - self.variation, 170 - self.variation, 170 - self.variation)
+        self.direction = random.choice([0, 1])
+        self.lifetime = 100
+
+    def update(self, grid, cell_dict):
+        neighbors = self.neighbors(grid)
+
+        self.lifetime -= 1
+
+        # Move smoke upwards and less to the sides
+        normal = random.normalvariate(5, 10)  # normal distrubution
+        if neighbors[8] == WATER_LAYER:
+            self.remove(grid, cell_dict)
+            return
+
+        # Die if out of bounds or it's lifetime is done
+        if (
+            neighbors[0] == -1
+            or neighbors[1] == -1
+            or neighbors[2] == -1
+            or self.lifetime <= 0
+        ):
+            self.remove(grid, cell_dict)
+
+        # Move up and to the left
+        if (
+            normal < 2
+            and neighbors[0] in self.ignore_layers
+            and neighbors[3] in self.ignore_layers
+        ):
+            self.move(grid, -1, -1)
+        # Move up and to the right
+        elif (
+            normal > 8
+            and neighbors[1] in self.ignore_layers
+            and neighbors[4] in self.ignore_layers
+        ):
+            self.move(grid, 1, -1)
+        # Move up
+        elif neighbors[1] in self.ignore_layers:
+            self.move(grid, 0, -1)
+        # Move to the left or right depending on direction
+        elif (
+            self.direction
+            and neighbors[1] not in self.ignore_layers
+            and neighbors[3] in self.ignore_layers
+        ):
+            self.move(grid, -1, 0)
+        # Move to the right
+        elif (
+            neighbors[1] not in self.ignore_layers
+            and neighbors[4] in self.ignore_layers
+        ):
+            self.move(grid, 1, 0)
+        # Reset direction
+        else:
+            self.direction = random.choice([0, 1])
+
+        # Dim color over time
+        color = max(0, int(((170 - self.variation) / 100) * self.lifetime))
+        self.color = (color, color, color)
+
+
 # Fire Cell
 # Layer: 4
 class Fire(Cell):
-    def __init__(self, position=(0, 0)):
-        super().__init__("fire", position, FIRE_LAYER)
+    def __init__(self, position=(0, 0), lifetime=10):
+        super().__init__("fire", position, FIRE_LAYER, [EMPTY_LAYER, SMOKE_LAYER])
 
         variation = random.randrange(10, 100)
         self.color = (255 - variation, 120 - variation, 0)
         self.direction = random.choice([0, 1])
-        self.lifetime = 200
+        self.lifetime = lifetime
 
     # Update Cell
     def update(self, grid, cell_dict):
@@ -210,32 +295,42 @@ class Fire(Cell):
             self.remove(grid, cell_dict)
             return
 
-        if normal < 2 and neighbors[0] == EMPTY_LAYER and neighbors[3] == EMPTY_LAYER:
-            self.move(grid, -1, -1)
-        elif normal > 8 and neighbors[1] == EMPTY_LAYER and neighbors[4] == EMPTY_LAYER:
-            self.move(grid, 1, -1)
-        elif neighbors[1] == EMPTY_LAYER:
-            self.move(grid, 0, -1)
-        elif (
-            self.direction
-            and neighbors[1] == FIRE_LAYER
-            and neighbors[3] == EMPTY_LAYER
-        ):
-            self.move(grid, -1, 0)
-        elif neighbors[1] == FIRE_LAYER and neighbors[4] == EMPTY_LAYER:
-            self.move(grid, 1, 0)
-        elif (
+        if (
             neighbors[0] == -1
             or neighbors[1] == -1
             or neighbors[2] == -1
             or self.lifetime <= 0
         ):
             self.remove(grid, cell_dict)
+            return
+
+        if (
+            normal < 2
+            and neighbors[0] in self.ignore_layers
+            and neighbors[3] in self.ignore_layers
+        ):
+            self.move(grid, -1, -1)
+        elif (
+            normal > 8
+            and neighbors[1] in self.ignore_layers
+            and neighbors[4] in self.ignore_layers
+        ):
+            self.move(grid, 1, -1)
+        elif neighbors[1] in self.ignore_layers:
+            self.move(grid, 0, -1)
+        elif (
+            self.direction
+            and neighbors[1] == FIRE_LAYER
+            and neighbors[3] in self.ignore_layers
+        ):
+            self.move(grid, -1, 0)
+        elif neighbors[1] in self.ignore_layers and neighbors[4] in self.ignore_layers:
+            self.move(grid, 1, 0)
         else:
             self.direction = random.choice([0, 1])
 
+        # Burn the solids
         if SOLID_LAYER in neighbors:
-            # print(neighbors)
             # Loop through neighboring
             for y in range(-1, 2):
                 for x in range(-1, 2):
@@ -245,14 +340,26 @@ class Fire(Cell):
                             self.position[0] + x,
                             self.position[1] + y,
                         ):
+                            # Kill the solid and spread the fire + smoke(3)
                             if cell.burn_damage < 0:
                                 cell.remove(grid, cell_dict)
+                                self.lifetime += 20
                                 grid[cell.position[0]][cell.position[1]] = 2
                                 cell_dict["fire"].append(
-                                    Fire((cell.position[0], cell.position[1]))
+                                    Fire((cell.position[0], cell.position[1]), 30)
+                                )
+                                cell_dict["smoke"].append(
+                                    Smoke((cell.position[0], cell.position[1] - 1))
+                                )
+                                cell_dict["smoke"].append(
+                                    Smoke((cell.position[0], cell.position[1] - 1))
+                                )
+                                cell_dict["smoke"].append(
+                                    Smoke((cell.position[0], cell.position[1] - 1))
                                 )
                             else:
                                 cell.burn_damage -= 1
+                                self.lifetime += 1
 
 
 # Destroy Cell

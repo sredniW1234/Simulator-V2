@@ -18,6 +18,7 @@ GhostCellFix = 0
 cell_type = "solid"  # Default cell type
 cells = {
     "fire": [],
+    "smoke": [],
     "water": [],
     "sand": [],
     "burn solid": [],
@@ -86,6 +87,7 @@ def update(dt):
             cells["sand"][::-1]
             + cells["water"][::-1]
             + cells["fire"][::-1]
+            + cells["smoke"][::-1]
             + cells["destroy"]
         ):
             cell.update(grid, cells)
