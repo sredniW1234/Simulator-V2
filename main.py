@@ -19,11 +19,14 @@ cell_type = "solid"  # Default cell type
 cells = {
     "fire": [],
     "smoke": [],
+    "acid": [],
     "water": [],
     "sand": [],
-    "burn solid": [],
+    "wood": [],
     "solid": [],
     "destroy": [],
+    "examine": [],
+    "time slow": [],
 }  # Dictionary to hold cell types and their instances
 valid_substance = list(cells.keys()) + ["empty"]  # valid substances each cell can be
 
@@ -37,7 +40,7 @@ def update(dt):
     x += v * dt
     and this will scale your velocity based on time. Extend as necessary."""
 
-    global cell_type, timer, CellFramePerSec, GhostCellFix
+    global cell_type, timer, CellFramePerUpdate, GhostCellFix
 
     for event in pygame.event.get():
         if event.type == QUIT:
@@ -59,12 +62,14 @@ def update(dt):
                     for cell in cells[celltype]:  # for each cell in the list
                         if cell.position == (x, y):
                             cell.remove(grid, cells)
+            elif cell_type == "examine":
+                print(grid[x, y])
             elif grid[x, y] == 0:
                 # Set the cell to a color
                 # grid[x, y] = 2 if cell_type in ["water", "fire"] else 1
                 # cells[f"{cell_type}"].append(Cell(cell_type, (x, y)))
-                if cell_type == "burn solid":
-                    cells["burn solid"].append(BurnSolid((x, y)))
+                if cell_type == "wood":
+                    cells["wood"].append(BurnSolid((x, y)))
                     grid[x, y] = SOLID_LAYER
                 elif cell_type == "solid":
                     cells["solid"].append(Solid((x, y)))
@@ -81,13 +86,28 @@ def update(dt):
                 elif cell_type == "destroy":
                     cells["destroy"].append(Destroy((x, y)))
                     grid[x, y] = EMPTY_LAYER
+                elif cell_type == "acid":
+                    cells["acid"].append(Acid((x, y)))
+                    grid[x, y] = WATER_LAYER
+                elif cell_type == "time slow":
+                    cell_ = Solid((x, y))
+                    cell_.color = (255, 0, 255)
+                    cell_.cell_type = "time slow"
+                    cells["time slow"].append(cell_)
+                    grid[x, y] = SOLID_LAYER
 
     if pygame.time.get_ticks() - timer > CellFramePerUpdate:
+        if len(cells["time slow"]) > 0:
+            CellFramePerUpdate = 300
+        else:
+            CellFramePerUpdate = 30
+
         for cell in (
-            cells["sand"][::-1]
-            + cells["water"][::-1]
-            + cells["fire"][::-1]
-            + cells["smoke"][::-1]
+            cells["sand"]
+            + cells["water"]
+            + cells["acid"]
+            + cells["fire"]
+            + cells["smoke"]
             + cells["destroy"]
         ):
             cell.update(grid, cells)
@@ -145,3 +165,15 @@ def runPyGame():
 
 if __name__ == "__main__":
     runPyGame()
+
+
+# TO ADD (According to Pizza and Rick):
+# Mud -- Like clay but really soft
+# Muddy Mud Mud -- Well, it's like... s-sand but hard?
+# Clay -- Like mud but really hard
+# Limestone -- Stone that is lime
+# Wood -- For making houses
+# Bricks -- Hard course material?
+# High quality wood -- Fresh off the tree that you chop from trees. Perfect.
+# Temperature(?)
+# Glass -- looks cool according to pizza
